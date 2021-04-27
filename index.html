@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Snap</title>
+  <meta charset="utf-8">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/ace.js" type="text/javascript" charset="utf-8"></script>
+  <script src="https://cdn.opalrb.com/opal/current/opal.js" onload="Opal.load('opal')"></script>
+  <script src="https://cdn.opalrb.com/opal/current/opal-parser.js" onload="Opal.load('opal-parser')"></script>
+  <style type="text/css">
+    body {
+      background-color: #eee;
+    }
+    #left {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      bottom: 10px;
+      width: 300px;
+      background-color: #fff;
+    }
+    #right {
+      position: absolute;
+      top: 10px;
+      left: 320px;
+      bottom: 10px;
+      right: 10px;
+      overflow: scroll;
+      background-color: #fff;
+    }
+    .fill {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      bottom: 10px;
+      right: 10px;
+      max-height: calc(100% - 20px);
+      max-width: calc(100% - 20px)
+    }
+    #sash {
+      background-color: #eee;
+      box-sizing: border-box;
+      cursor: ew-resize;
+      position: absolute;
+      top: 0px;
+      bottom: 0px;
+      left: 310px;
+      width: 10px;
+      z-index: 1000;
+    }
+    .dragging {
+      border: 5px dashed #eaeaea;
+    }
+    .sprite {
+      transform-box: fill-box;
+      transform-origin: center;
+    }
+  </style>
+  <script type="text/ruby">
+    puts "Ruby Code"
+
+    def method_missing(name, *args)
+      puts 'hmmm'
+      actor = `window.actor`
+      puts actor, name, args
+      actor.JS[name.to_sym](*args)
+    end
+  </script>
+  <script type="text/javascript">
+    const SVG_NS = "http://www.w3.org/2000/svg";
+
+    class Line {
+      _x1;
+      _y1;
+      _x2;
+      _y2;
+      _svg;
+      _stroke = "black";
+
+      constructor(x1, y1, x2, y2) {
+        console.log(x1, y1, x2, y2)
+        this._svg = document.createElementNS(SVG_NS, "line");
+        this._svg.setAttribute("x1", x1);
+        this._svg.setAttribute("y1", y1);
+        this._svg.setAttribute("x2", x2);
+        this._svg.setAttribute("y2", y2);
+        this._svg.setAttribute("stroke", "black");
+        stage.appendChild(this._svg); // TODO: not global stage
+      }
+    }
+
+    class SpriteLoader {
+      constructor() {
+        this._div = document.createElement("div");
+        this._div.style = "display:none";
+        document.body.appendChild(this._div);
+      }
+
+      load(url, callback) {
+        const img = document.createElement("img");
+        img.onload = (e) => callback(img);
+        img.src = url;
+        this._div.appendChild(img);
+      }
+    }
+
+    class Sprite {
+      _name;
+      _svg;
+      _x = 500;
+      _y = 500;
+      _scale = 0.3;
+      _rotate = 0;
+      _width;
+      _height;
+
+      constructor(name, width, height) {
+        console.log(width, height);
+        this._name = name;
+        this._width = width;
+        this._height = height;
+        this._svg = document.createElementNS(SVG_NS, "image");
+        this._svg.setAttribute("x", -width / 2);
+        this._svg.setAttribute("y", -height / 2);
+        this._svg.setAttribute("preserveAspectRatio", "xMinYMin");
+        this._svg.setAttribute("href", `images/${name}.png`);
+        this._svg.setAttribute("class", "sprite");
+        stage.appendChild(this._svg); // TODO: not global stage
+        this.draw();
+      }
+
+      rotateBy(deg) {
+        this._rotate += deg;
+        this.draw();
+      }
+
+      leftTurn(deg) {
+        this.rotateBy(-deg);
+      }
+
+      rightTurn(deg) {
+        this.rotateBy(deg);
+      }
+
+      forward(steps) {
+        let x1 = this._x
+        let y1 = this._y
+        let rad = this._rotate / 360.0 * Math.PI * 2
+        let x2 = x1 + steps * Math.sin(rad)
+        let y2 = y1 - steps * Math.cos(rad)
+
+        this._x = x2;
+        this._y = y2;
+        this.draw();
+
+        // Line.new(x1: x1, y1: y1, x2: x2, y2: y2, color: pen_color, width: pen_size) unless pen_up?
+      }
+
+      draw() {
+        this._svg.setAttribute("transform", `translate(${this._x} ${this._y}) scale(${this._scale}) rotate(${this._rotate})`);
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', (event) => {
+      // Sash
+      var sash = document.getElementById('sash');
+
+      function handleDragStart(e) {
+        sash.addEventListener('pointermove', handleDragMove);
+        sash.addEventListener('pointerup', handleDragEnd);
+        sash.classList.add('dragging');
+        sash.setPointerCapture(e.pointerId);
+      }
+
+      function handleDragMove(e) {
+        sash.style.left = e.clientX + "px";
+        var width = parseInt(sash.style.left);
+        document.getElementById('left').style.width = (width - 10) + "px";
+        document.getElementById('right').style.left = (width + 10) + "px";
+      }
+
+      function handleDragEnd(e) {
+        sash.removeEventListener('pointermove', handleDragMove);
+        sash.removeEventListener('pointerup', handleDragEnd);
+        sash.classList.remove('dragging');
+        var width = parseInt(sash.style.left);
+        document.getElementById('left').style.width = (width - 10) + "px";
+        document.getElementById('right').style.left = (width + 10) + "px";
+        sash.releasePointerCapture(e.pointerId);
+      }
+
+      sash.addEventListener('pointerdown', handleDragStart, false);
+
+      // ---------------------------------------------------
+      // SVG
+      const stage = document.getElementById('stage')
+      const spriteLoader = new SpriteLoader();
+      spriteLoader.load('images/turtle.png', (img) => {
+        window.actor = new Sprite('turtle', img.naturalWidth, img.naturalHeight);
+      });
+
+
+      new Line(0, 500, 1000, 500);
+      new Line(500, 0, 500, 1000);
+
+      stage.addEventListener("click", (e) => {
+        // turtle.rotateBy(10);
+        // turtle.forward(50);
+        let code = editor.getValue();
+        console.log(code)
+        console.log(Opal.compile(code));
+        Opal.eval(code);
+      });
+
+      var editor = ace.edit("editor");
+      editor.setTheme("ace/theme/xcode");
+      editor.session.setMode("ace/mode/ruby");
+      editor.session.setTabSize(2);
+      editor.session.setUseSoftTabs(false);
+    });
+  </script>
+</head>
+<body>
+  <div id="left">
+    <div id="editor" class="fill">
+      turtle.dostuff
+    </div>
+  </div>
+  <div id="sash">
+  </div>
+  <div id="right">
+    <svg id='stage' class="fill" viewBox="0 0 1000 1000" xmlns="http://www.w3.org/2000/svg" stroke="red" fill="grey">
+      <circle cx="50" cy="50" r="40" />
+      <circle cx="150" cy="50" r="4" />
+      <circle cx="950" cy="950" r="4" />
+      <circle cx="950" cy="500" r="80" />
+      <line x1="0" y1="0" x2="1000" y2="0" />
+      <line x1="0" y1="0" x2="0" y2="1000" />
+      <line x1="1000" y1="0" x2="1000" y2="1000" />
+      <line x1="0" y1="1000" x2="1000" y2="1000" />
+    </svg>
+  </div>
+</body>
+</html>
